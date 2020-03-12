@@ -5,6 +5,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -36,7 +37,24 @@ func main() {
 	upload := os.Getenv("AWS_UPLOAD") == "true"
 
 	maxChecks := 40
+	if raw := os.Getenv("AWS_MAX_CHECKS"); raw != "" {
+		n, _ := strconv.ParseInt(raw, 10, 64)
+		if n <= 0 {
+			log.Fatal("AWS_MAX_CHECKS must be greater than 0")
+		}
+
+		maxChecks = int(n)
+	}
+
 	checkInterval := time.Second * 2
+	if raw := os.Getenv("AWS_CHECK_STATUS_INTERVAL"); raw != "" {
+		n, _ := strconv.ParseInt(raw, 10, 64)
+		if n <= 0 {
+			log.Fatal("AWS_CHECK_STATUS_INTERVAL must be greater than 0")
+		}
+
+		checkInterval = time.Second * time.Duration(n)
+	}
 
 	sess, err := session.NewSession()
 	if err != nil {
@@ -69,12 +87,10 @@ func main() {
 			log.Fatalf("[Upload] err; %v\n", err)
 		}
 
-		log.Printf("[Upload] uploaded; %v\n", resp)
+		log.Println("[Upload]", resp)
 	}
 
 	{
-		log.Println("[Create]")
-
 		ap, err := client.CreateApplicationVersion(
 			&elasticbeanstalk.CreateApplicationVersionInput{
 				VersionLabel:          aws.String(version),
@@ -90,13 +106,10 @@ func main() {
 			log.Fatalf("[Create] err; %v\n", err)
 		}
 
-		log.Println("[Create] created")
-		log.Println(ap)
+		log.Println("[Create]", ap)
 	}
 
 	{
-		log.Println("[Update]")
-
 		up, err := client.UpdateEnvironment(
 			&elasticbeanstalk.UpdateEnvironmentInput{
 				VersionLabel:    aws.String(version),
@@ -108,8 +121,7 @@ func main() {
 			log.Fatalf("[Update] err; %v\n", err)
 		}
 
-		log.Println("[Update] updated")
-		log.Println(up)
+		log.Println("[Update]", up)
 		time.Sleep(checkInterval)
 	}
 
