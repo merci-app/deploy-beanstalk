@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -24,6 +25,30 @@ func Env(key string) string {
 	return value
 }
 
+func DurationFromEnv(key string, defaultValue time.Duration) time.Duration {
+	if raw := os.Getenv(key); raw != "" {
+		raw = strings.ToLower(strings.TrimSpace(raw))
+
+		format := time.Second
+		switch raw[len(raw)-1] {
+		case 'm':
+			format = time.Minute
+			fallthrough
+		case 's':
+			raw = raw[:len(raw)-1]
+		}
+
+		n, _ := strconv.ParseInt(raw, 10, 64)
+		if n <= 0 {
+			log.Fatalf("%s must be greater than 0", key)
+		}
+
+		return format * time.Duration(n)
+	}
+
+	return defaultValue
+}
+
 func main() {
 	application := Env("AWS_APPLICATION")
 	environment := Env("AWS_ENVIRONMENT")
@@ -35,26 +60,9 @@ func main() {
 	version := Env("AWS_VERSION")
 	autoCreate := os.Getenv("AWS_AUTO_CREATE") == "true"
 	upload := os.Getenv("AWS_UPLOAD") == "true"
-
-	maxChecks := 40
-	if raw := os.Getenv("AWS_MAX_CHECKS"); raw != "" {
-		n, _ := strconv.ParseInt(raw, 10, 64)
-		if n <= 0 {
-			log.Fatal("AWS_MAX_CHECKS must be greater than 0")
-		}
-
-		maxChecks = int(n)
-	}
-
-	checkInterval := time.Second * 2
-	if raw := os.Getenv("AWS_CHECK_STATUS_INTERVAL"); raw != "" {
-		n, _ := strconv.ParseInt(raw, 10, 64)
-		if n <= 0 {
-			log.Fatal("AWS_CHECK_STATUS_INTERVAL must be greater than 0")
-		}
-
-		checkInterval = time.Second * time.Duration(n)
-	}
+	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*5)
+	checkInterval := DurationFromEnv("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
+	maxChecks := int(checkStatusTimeout / checkInterval)
 
 	sess, err := session.NewSession()
 	if err != nil {
@@ -122,11 +130,12 @@ func main() {
 		}
 
 		log.Println("[Update]", up)
-		time.Sleep(checkInterval)
 	}
 
 	// check status
 	for i := 0; i < maxChecks; i++ {
+		time.Sleep(checkInterval)
+
 		out, err := client.DescribeEnvironmentHealth(&elasticbeanstalk.DescribeEnvironmentHealthInput{
 			AttributeNames:  []*string{aws.String(elasticbeanstalk.EnvironmentHealthAttributeAll)},
 			EnvironmentName: aws.String(environment),
@@ -145,11 +154,9 @@ func main() {
 				break
 			}
 		}
-
-		time.Sleep(checkInterval)
 	}
 
-	log.Fatalf("[Status] Timeout after %d seconds", maxChecks*int(checkInterval/time.Second))
+	log.Fatalf("[Status] Timeout after %v", checkStatusTimeout)
 }
 
 func contentType(path string) string {
