@@ -20,7 +20,7 @@ AWS_VERSION=                 # version label for the app(must be unique)
 AWS_DESCRIPTION=             # description for the app version
 AWS_UPLOAD=false             # upload file(AWS_BUCKT_KEY) to S3
 AWS_AUTO_CREATE=false        # auto create app if it doesn't exist
-AWS_CHECK_STATUS_INTERVAL=2s # interval between status check
+AWS_CHECK_STATUS_INTERVAL=5s # interval between status check
 AWS_CHECK_STATUS_TIMEOUT=5m  # how long it will wait until EB succeed or fail
 
 # run with go
