@@ -62,6 +62,8 @@ func main() {
 	upload := os.Getenv("AWS_UPLOAD") == "true"
 	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*5)
 	checkInterval := DurationFromEnv("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
+	degradeTimeout := DurationFromEnv("AWS_DEGRATE_STATUS_TIMEOUT", time.Second)
+
 	maxChecks := int(checkStatusTimeout / checkInterval)
 
 	sess, err := session.NewSession()
@@ -132,6 +134,8 @@ func main() {
 		log.Println("[Update]", up)
 	}
 
+	var degradeStart time.Time
+
 	// check status
 	for i := 0; i < maxChecks; i++ {
 		time.Sleep(checkInterval)
@@ -150,8 +154,15 @@ func main() {
 				os.Exit(0)
 				break
 			} else if *out.HealthStatus == elasticbeanstalk.EnvironmentHealthStatusDegraded {
-				os.Exit(2)
+				if degradeStart.IsZero() {
+					degradeStart = time.Now()
+				} else if time.Since(degradeStart) >= degradeTimeout {
+					os.Exit(2)
+				}
+
 				break
+			} else {
+				degradeStart = time.Time{}
 			}
 		}
 	}
