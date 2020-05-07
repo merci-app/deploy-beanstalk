@@ -157,6 +157,7 @@ func main() {
 				if degradeStart.IsZero() {
 					degradeStart = time.Now()
 				} else if time.Since(degradeStart) >= degradeTimeout {
+					log.Fatalf("[Status] Timeout after %v", checkStatusTimeout)
 					os.Exit(2)
 				}
 			} else {
@@ -164,8 +165,6 @@ func main() {
 			}
 		}
 	}
-
-	log.Fatalf("[Status] Timeout after %v", checkStatusTimeout)
 }
 
 func contentType(path string) string {
