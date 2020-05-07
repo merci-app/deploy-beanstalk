@@ -159,8 +159,6 @@ func main() {
 				} else if time.Since(degradeStart) >= degradeTimeout {
 					os.Exit(2)
 				}
-
-				break
 			} else {
 				degradeStart = time.Time{}
 			}
