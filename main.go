@@ -60,11 +60,9 @@ func main() {
 	version := Env("AWS_VERSION")
 	autoCreate := os.Getenv("AWS_AUTO_CREATE") == "true"
 	upload := os.Getenv("AWS_UPLOAD") == "true"
-	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*5)
+	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
 	checkInterval := DurationFromEnv("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
-	degradeTimeout := DurationFromEnv("AWS_DEGRATE_STATUS_TIMEOUT", time.Second)
-
-	maxChecks := int(checkStatusTimeout / checkInterval)
+	degradedTimeout := DurationFromEnv("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
 
 	sess, err := session.NewSession()
 	if err != nil {
@@ -79,6 +77,7 @@ func main() {
 
 	// Upload
 	if upload {
+		log.Println("[Upload]", bucketKey)
 		body, err := os.Open(bucketKey)
 		if err != nil {
 			log.Fatalf("[Upload] Bucket Key err; %v\n", err)
@@ -134,10 +133,12 @@ func main() {
 		log.Println("[Update]", up)
 	}
 
-	var degradeStart time.Time
+	var degradedStart time.Time
+
+	start := time.Now()
 
 	// check status
-	for i := 0; i < maxChecks; i++ {
+	for time.Since(start) < checkStatusTimeout {
 		time.Sleep(checkInterval)
 
 		out, err := client.DescribeEnvironmentHealth(&elasticbeanstalk.DescribeEnvironmentHealthInput{
@@ -154,17 +155,19 @@ func main() {
 				os.Exit(0)
 				break
 			} else if *out.HealthStatus == elasticbeanstalk.EnvironmentHealthStatusDegraded {
-				if degradeStart.IsZero() {
-					degradeStart = time.Now()
-				} else if time.Since(degradeStart) >= degradeTimeout {
-					log.Fatalf("[Status] Timeout after %v", checkStatusTimeout)
+				if degradedStart.IsZero() {
+					degradedStart = time.Now()
+				} else if time.Since(degradedStart) >= degradedTimeout {
+					log.Fatalf("[Status] Degraded timeout after %v", time.Since(degradedStart))
 					os.Exit(2)
 				}
 			} else {
-				degradeStart = time.Time{}
+				degradedStart = time.Time{}
 			}
 		}
 	}
+
+	log.Fatalf("[Status] Timeout after %v", time.Since(start))
 }
 
 func contentType(path string) string {
