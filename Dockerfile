@@ -4,6 +4,7 @@ ADD . .
 RUN GOOS=linux CGO_ENABLED=0 go build -o bin/deploy cmd/deploy/deploy.go
 RUN GOOS=linux CGO_ENABLED=0 go build -o bin/checkenv cmd/checkenv/checkenv.go
 RUN GOOS=linux CGO_ENABLED=0 go build -o bin/uploads3 cmd/uploads3/uploads3.go
+RUN GOOS=linux CGO_ENABLED=0 go build -o bin/fileexistsons3 cmd/fileexistsons3/fileexistsons3.go
 RUN GOOS=linux CGO_ENABLED=0 go build -o bin/updateeb cmd/updateeb/updateeb.go
 
 FROM alpine:3.11

@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
-	"mime"
+	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -27,13 +27,11 @@ func main() {
 	accessKey := Env("AWS_ACCESS_KEY")
 	secretKey := Env("AWS_SECRET_KEY")
 
-	if len(os.Args) != 3 {
-		log.Fatal("uploads3 file bucket:file")
+	if len(os.Args) != 2 {
+		log.Fatal("fileexistsons3 bucket:file")
 	}
 
-	src := os.Args[1]
-
-	pieces := strings.Split(os.Args[2], ":")
+	pieces := strings.Split(os.Args[1], ":")
 	if len(pieces) != 2 {
 		log.Fatal("please provide bucket:path")
 	}
@@ -51,33 +49,21 @@ func main() {
 		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
 	}
 
-	// Upload
-	body, err := os.Open(src)
-	if err != nil {
-		log.Fatalf("[Upload S3] Could not open source file; %v\n", err)
-	}
-	defer body.Close()
-
-	resp, err := s3.New(sess, conf).PutObject(&s3.PutObjectInput{
-		Body:        body,
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(dest),
-		ContentType: aws.String(contentType(dest)),
+	resp, err := s3.New(sess, conf).HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(dest),
 	})
+
 	if err != nil {
-		log.Fatalf("[Upload S3] Could not upload file; %v\n", err)
+		if awsErr, is := err.(awserr.RequestFailure); is {
+			if awsErr.StatusCode() == http.StatusNotFound {
+				log.Println("[File Exists on S3] err;", err)
+				os.Exit(4)
+			}
+		}
+
+		log.Fatalf("[File Exists on S3] Could check file; %v\n", err)
 	}
 
-	log.Println("[Upload S3]", resp)
-}
-
-func contentType(path string) string {
-	ext := filepath.Ext(path)
-	typ := mime.TypeByExtension(ext)
-
-	if typ == "" {
-		typ = "application/octet-stream"
-	}
-
-	return typ
+	_, _ = os.Stdout.WriteString(resp.String())
 }
