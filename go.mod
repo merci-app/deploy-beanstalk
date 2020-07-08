@@ -1,5 +1,5 @@
-module github.com/rafaelsq/deploy-beanstalk
+module awsutils
 
-go 1.13
+go 1.14
 
-require github.com/aws/aws-sdk-go v1.29.20
+require github.com/aws/aws-sdk-go v1.33.3

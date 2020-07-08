@@ -3,23 +3,13 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"awsutils/pkg/config"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticbeanstalk"
 )
-
-func Env(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("[Requirements] Env %s is empty", key)
-	}
-
-	return value
-}
 
 func panicIfEmpty(label string, val *string) {
 	if *val == "" {
@@ -28,10 +18,6 @@ func panicIfEmpty(label string, val *string) {
 }
 
 func main() {
-	region := Env("AWS_REGION")
-	accessKey := Env("AWS_ACCESS_KEY")
-	secretKey := Env("AWS_SECRET_KEY")
-
 	rawEnvs := flag.String("envs", "", "list of environment variables")
 	application := flag.String("application", "", "application name")
 	environment := flag.String("environment", "", "environment name")
@@ -52,11 +38,7 @@ func main() {
 		log.Fatalf("[Session] err; %v\n", err)
 	}
 
-	conf := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-	}
-	client := elasticbeanstalk.New(sess, conf)
+	client := elasticbeanstalk.New(sess, config.New())
 
 	desc, err := client.DescribeConfigurationSettings(&elasticbeanstalk.DescribeConfigurationSettingsInput{
 		ApplicationName: application,

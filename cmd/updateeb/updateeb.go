@@ -6,48 +6,16 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"awsutils/pkg/config"
+	"awsutils/pkg/env"
+
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticbeanstalk"
 )
-
-func Env(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("[Requirements] Env %s is empty", key)
-	}
-
-	return value
-}
-
-func DurationFromEnv(key string, defaultValue time.Duration) time.Duration {
-	if raw := os.Getenv(key); raw != "" {
-		raw = strings.ToLower(strings.TrimSpace(raw))
-
-		format := time.Second
-		switch raw[len(raw)-1] {
-		case 'm':
-			format = time.Minute
-			fallthrough
-		case 's':
-			raw = raw[:len(raw)-1]
-		}
-
-		n, _ := strconv.ParseInt(raw, 10, 64)
-		if n <= 0 {
-			log.Fatalf("%s must be greater than 0", key)
-		}
-
-		return format * time.Duration(n)
-	}
-
-	return defaultValue
-}
 
 func panicIfEmpty(label string, val *string) {
 	if *val == "" {
@@ -56,10 +24,6 @@ func panicIfEmpty(label string, val *string) {
 }
 
 func main() {
-	region := Env("AWS_REGION")
-	accessKey := Env("AWS_ACCESS_KEY")
-	secretKey := Env("AWS_SECRET_KEY")
-
 	application := flag.String("application", "", "application name")
 	environment := flag.String("environment", "", "environment name")
 	version := flag.String("version", "", "unique version name")
@@ -79,19 +43,17 @@ func main() {
 	bucket := pieces[0]
 	bucketKey := pieces[1]
 
-	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
-	checkInterval := DurationFromEnv("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
-	degradedTimeout := DurationFromEnv("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
+	checkStatusTimeout := env.Duration("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
+	checkInterval := env.Duration("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
+	degradedTimeout := env.Duration("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
 
 	sess, err := session.NewSession()
 	if err != nil {
 		log.Fatalf("[Session] err; %v\n", err)
 	}
 
-	conf := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-	}
+	conf := config.New()
+
 	client := elasticbeanstalk.New(sess, conf)
 
 	{

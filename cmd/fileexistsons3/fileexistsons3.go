@@ -6,27 +6,15 @@ import (
 	"os"
 	"strings"
 
+	"awsutils/pkg/config"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-func Env(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("[Requirements] Env %s is empty", key)
-	}
-
-	return value
-}
-
 func main() {
-	region := Env("AWS_REGION")
-	accessKey := Env("AWS_ACCESS_KEY")
-	secretKey := Env("AWS_SECRET_KEY")
-
 	if len(os.Args) != 2 {
 		log.Fatal("fileexistsons3 bucket:file")
 	}
@@ -44,10 +32,7 @@ func main() {
 		log.Fatalf("[Session] err; %v\n", err)
 	}
 
-	conf := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-	}
+	conf := config.New()
 
 	resp, err := s3.New(sess, conf).HeadObject(&s3.HeadObjectInput{
 		Bucket: aws.String(bucket),

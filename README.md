@@ -11,6 +11,11 @@
 AWS_REGION=
 AWS_ACCESS_KEY=
 AWS_SECRET_KEY=
+
+# optional=(default value)
+MAX_RETRIES=20
+MIN_RETRY_DELAY=1s
+MAX_RETRY_DELAY=1m
 ```
 
 ```bash
@@ -21,7 +26,6 @@ checkenv -application=name -environment=name -envs="ENV ENV2 ENV3"
 fileexistsons3 bucket:path/file.zip
 echo $?
 # not found exit with code 4
-
 
 # upload file.zip to s3
 uploads3 file.zip bucket:path/file.zip
