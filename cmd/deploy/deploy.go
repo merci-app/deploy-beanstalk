@@ -5,75 +5,35 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
+	"awsutils/pkg/config"
+	"awsutils/pkg/env"
+
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticbeanstalk"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-func Env(key string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		log.Fatalf("[Requirements] Env %s is empty", key)
-	}
-
-	return value
-}
-
-func DurationFromEnv(key string, defaultValue time.Duration) time.Duration {
-	if raw := os.Getenv(key); raw != "" {
-		raw = strings.ToLower(strings.TrimSpace(raw))
-
-		format := time.Second
-		switch raw[len(raw)-1] {
-		case 'm':
-			format = time.Minute
-			fallthrough
-		case 's':
-			raw = raw[:len(raw)-1]
-		}
-
-		n, _ := strconv.ParseInt(raw, 10, 64)
-		if n <= 0 {
-			log.Fatalf("%s must be greater than 0", key)
-		}
-
-		return format * time.Duration(n)
-	}
-
-	return defaultValue
-}
-
 func main() {
-	application := Env("AWS_APPLICATION")
-	environment := Env("AWS_ENVIRONMENT")
-	region := Env("AWS_REGION")
-	accessKey := Env("AWS_ACCESS_KEY")
-	secretKey := Env("AWS_SECRET_KEY")
-	bucket := Env("AWS_BUCKET")
-	bucketKey := Env("AWS_BUCKET_KEY")
-	version := Env("AWS_VERSION")
+	application := env.String("AWS_APPLICATION")
+	environment := env.String("AWS_ENVIRONMENT")
+	bucket := env.String("AWS_BUCKET")
+	bucketKey := env.String("AWS_BUCKET_KEY")
+	version := env.String("AWS_VERSION")
 	autoCreate := os.Getenv("AWS_AUTO_CREATE") == "true"
 	upload := os.Getenv("AWS_UPLOAD") == "true"
-	checkStatusTimeout := DurationFromEnv("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
-	checkInterval := DurationFromEnv("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
-	degradedTimeout := DurationFromEnv("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
+	checkStatusTimeout := env.Duration("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
+	checkInterval := env.Duration("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
+	degradedTimeout := env.Duration("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
 
 	sess, err := session.NewSession()
 	if err != nil {
 		log.Fatalf("[Session] err; %v\n", err)
 	}
 
-	conf := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-	}
-	client := elasticbeanstalk.New(sess, conf)
+	conf := config.New()
 
 	// Upload
 	if upload {
@@ -84,9 +44,9 @@ func main() {
 		}
 		defer body.Close()
 
-		client := s3.New(sess, conf)
+		s3Client := s3.New(sess, conf)
 
-		resp, err := client.PutObject(&s3.PutObjectInput{
+		resp, err := s3Client.PutObject(&s3.PutObjectInput{
 			Body:        body,
 			Bucket:      aws.String(bucket),
 			Key:         aws.String(bucketKey),
@@ -98,6 +58,8 @@ func main() {
 
 		log.Println("[Upload]", resp)
 	}
+
+	client := elasticbeanstalk.New(sess, conf)
 
 	{
 		ap, err := client.CreateApplicationVersion(
