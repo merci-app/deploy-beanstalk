@@ -35,6 +35,7 @@ uploads3 file.zip bucket:path/file.zip
 # Options
 # AWS_CHECK_STATUS_INTERVAL=5s    # interval between status check
 # AWS_CHECK_STATUS_TIMEOUT=15m    # how long it will wait until EB succeed or fail
+# AWS_READY_STATUS_WAIT=15s       # how long it will wait with ready status
 # AWS_DEGRADED_STATUS_TIMEOUT=15m # how long it will wait with status degraded
 updateeb -application=name -environment=name -version=uniquie-hash -src=bucket:path
 ```

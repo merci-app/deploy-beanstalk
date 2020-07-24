@@ -46,6 +46,7 @@ func main() {
 	checkStatusTimeout := env.Duration("AWS_CHECK_STATUS_TIMEOUT", time.Minute*15)
 	checkInterval := env.Duration("AWS_CHECK_STATUS_INTERVAL", time.Second*5)
 	degradedTimeout := env.Duration("AWS_DEGRADED_STATUS_TIMEOUT", time.Minute*15)
+	readyTimeout := env.Duration("AWS_READY_STATUS_WAIT", checkInterval*3, 0)
 
 	sess, err := session.NewSession()
 	if err != nil {
@@ -91,6 +92,7 @@ func main() {
 	}
 
 	var degradedStart time.Time
+	var readyStart time.Time
 
 	start := time.Now()
 
@@ -109,8 +111,12 @@ func main() {
 		log.Printf("[Status] %s/%s\n", *out.Status, *out.HealthStatus)
 		if out.Status != nil && out.HealthStatus != nil && *out.Status == elasticbeanstalk.EnvironmentStatusReady {
 			if *out.HealthStatus == elasticbeanstalk.EnvironmentHealthStatusOk {
-				os.Exit(0)
-				break
+				if readyStart.IsZero() {
+					readyStart = time.Now()
+				} else if time.Since(readyStart) >= readyTimeout {
+					os.Exit(0)
+					break
+				}
 			} else if *out.HealthStatus == elasticbeanstalk.EnvironmentHealthStatusDegraded {
 				if degradedStart.IsZero() {
 					degradedStart = time.Now()
@@ -120,6 +126,7 @@ func main() {
 				}
 			} else {
 				degradedStart = time.Time{}
+				readyStart = time.Time{}
 			}
 		}
 	}
